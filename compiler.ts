@@ -164,7 +164,7 @@ function codeGenStmt(stmt: Stmt<Type>, env: GlobalEnv) : Array<string> {
 }
 
 function codeGenInit(init : VarInit<Type>, env : GlobalEnv) : Array<string> {
-  const value = codeGenLiteral(init.value, env);
+  const value = codeGenLiteral(init.value);
   if (env.locals.has(init.name)) {
     return [...value, `(local.set $${init.name})`]; 
   } else {
@@ -211,7 +211,8 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
       var callName = expr.name;
       if (expr.name === "print" && argTyp === NUM) {
         callName = "print_num";
-      } else if (expr.name === "print" && argTyp === STRING) {
+      } 
+      else if (expr.name === "print" && argTyp === STRING) {
         callName = "print_str";
         
         //In order to print all characters in a string, I am using the starting address of the first character to
@@ -244,7 +245,7 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
       const rightStmts = codeGenExpr(expr.right, env);
       return [...leftStmts, ...rightStmts, `(call $${expr.name})`]
     case "literal":
-      return codeGenLiteral(expr.value, env);
+      return codeGenLiteral(expr.value);
     case "id":
       if (env.locals.has(expr.name)) {
         return [`(local.get $${expr.name})`];
@@ -273,7 +274,7 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
         stmts.push(...[
           `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
           `(i32.add (i32.const ${offset * 4}))`,   // Calc field offset from heap offset
-          ...codeGenLiteral(initVal, env),              // Initialize field
+          ...codeGenLiteral(initVal),              // Initialize field
           "(i32.store)"                            // Put the default field value on the heap
         ]));
       return stmts.concat([
@@ -315,32 +316,44 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
   }
 }
 
-function allocateStringMemory(string_val:string, env: GlobalEnv) : Array<string>{
-  var newOffset = env.offset;
-  var startOffset = newOffset;
-  var i = 0;
-  const str_stmts = []; 
+function allocateStringMemory(string_val:string) : Array<string>{
+
+  const stmts = [];
+  var i=0;
   while(i!=string_val.length){
-    var ascii_val =  string_val.charCodeAt(i);
-    const locationToStore = `(i32.const ${newOffset*4})`;
-    const value = `(i32.const ${ascii_val})`;
-    str_stmts.push(locationToStore + value + `(i32.store)`);
-    newOffset+=1;
+    const char_ascii = string_val.charCodeAt(i);
+    stmts.push(...[
+      `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
+      `(i32.add (i32.const ${i * 4}))`,       // Calc field offset from heap offset
+      `(i32.const ${char_ascii})`,
+      "(i32.store)"                            // Put the default field value on the heap
+    ]);
     i+=1;
   }
-  str_stmts.push(`(i32.const ${newOffset*4})(i32.const 0)(i32.store)`) //end of string
-  newOffset+=1;
-  env.offset=newOffset;
-  str_stmts.push(`(i32.const ${startOffset*4})`); //return starting character address
-  return str_stmts;
+
+  //do something for ASCII 0
+  stmts.push(...[
+    `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
+    `(i32.add (i32.const ${i * 4}))`,       // Calc field offset from heap offset
+    `(i32.const 0)`,                        // Store ASCII value for 0
+    "(i32.store)"                            // Put the default field value on the heap
+  ]);
+
+  return stmts.concat([
+    "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
+    "(i32.const 0)",                                                  // Address for our upcoming store instruction
+    "(i32.load (i32.const 0))",                                       // Load the dynamic heap head offset
+    `(i32.add (i32.const ${(string_val.length+1) * 4}))`,   // Move heap head beyond the two words we just created for fields
+    "(i32.store)",                                                    // Save the new heap offset
+  ]);
 } 
 
-function codeGenLiteral(literal : Literal, env: GlobalEnv) : Array<string> {
+function codeGenLiteral(literal : Literal) : Array<string> {
   switch(literal.tag) {
     case "num":
       return ["(i32.const " + literal.value + ")"];
     case "string":
-      return allocateStringMemory(literal.value, env);
+      return allocateStringMemory(literal.value);
     case "bool":
       return [`(i32.const ${Number(literal.value)})`];
     case "none":

@@ -2,6 +2,7 @@ import {BasicREPL} from './repl';
 import { Type, Value } from './ast';
 import { defaultTypeEnv } from './type-check';
 import { NUM, BOOL, NONE, STRING } from './utils';
+import { memory } from 'console';
 
 function stringify(typ: Type, arg: any) : string {
   switch(typ.tag) {
