@@ -79,10 +79,12 @@ function webStart() {
           break;
         case "object":
           if(result.name=="String"){
-            elt.innerText = print(STRING, result.address);
-            break;
+            elt.innerText = stringify(STRING, result.address);
           }
-          elt.innerHTML = `<${result.name} object at ${result.address}`
+          else{
+          // elt.innerHTML = `<${result.name} object at ${result.address}`
+            elt.innerText = `<${result.name} object at ${result.address}`
+          }
           break
         default: throw new Error(`Could not render value: ${result}`);
       }
