@@ -72,6 +72,7 @@ export function compile(ast: Program<Type>, env: GlobalEnv) : CompileResult {
   
   const definedVars : Set<string> = new Set(); //getLocals(ast);
   definedVars.add("$last");
+  definedVars.add("$string_val"); //needed for string operations
   definedVars.forEach(env.locals.add, env.locals);
   const localDefines = makeLocals(definedVars);
   const funs : Array<string> = [];
@@ -290,6 +291,41 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
         `(i32.add (i32.const ${offset * 4}))`,
         `(i32.load)`
       ];
+    case "bracket-lookup":
+      //obj, key
+      console.log("Bracket lookup")
+      if(expr.a.tag=="string"){
+        var brObjStmts = codeGenExpr(expr.obj, env);
+        var brKeyStmts = codeGenExpr(expr.key, env);
+        var brStmts = []
+
+        brStmts.push(...[
+          `${brObjStmts.join("\n")}`,                                   //Load the string object to be indexed
+          `(i32.add (i32.mul (i32.const 4)${brKeyStmts.join("\n")}))`,  //Add the index * 4 value to the address
+          `(i32.load)`,                                                 //Load the ASCII value of the string index
+          `(local.set $$string_val)`,                                   //store value in temp variable
+          `(i32.load (i32.const 0))`,                                   //load value at 0
+          `(local.get $$string_val)`,                                   //load value in temp variable
+          "(i32.store)"                                                 //Store the ASCII value in the new address
+        ]);
+
+        //At end of string, we store ASCII value 0 which represents null
+        brStmts.push(...[
+          `(i32.load (i32.const 0))`,               // Load the dynamic heap head offset
+          `(i32.add (i32.const 4))`,                // Calc string index offset from heap offset
+          `(i32.const 0)`,                          // Store ASCII value for 0 (end of string)
+          "(i32.store)"                             // Store the ASCII value 0 in the new address
+        ]);
+
+        brStmts.push(...[
+          "(i32.load (i32.const 0))",               // Get address for the indexed character of the string
+          "(i32.const 0)",                          // Address for our upcoming store instruction
+          "(i32.load (i32.const 0))",               // Load the dynamic heap head offset
+          `(i32.add (i32.const 8))`,                // Move heap head beyond the string length
+          "(i32.store)",                            // Save the new heap offset
+        ]);
+        return brStmts;
+      }
   }
 }
 

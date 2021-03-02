@@ -1,14 +1,20 @@
 const python = require('lezer-python');
 
-const input = "-1";
+const input=`print("ABC"[10])`
 
 const tree = python.parser.parse(input);
-
 const cursor = tree.cursor();
 
-do {
-//  console.log(cursor.node);
-  console.log(cursor.node.type.name);
-  console.log(input.substring(cursor.node.from, cursor.node.to));
-} while(cursor.next());
+function vizTree(cursor, s, depth) {
+    console.log (Array(depth * 2 + 1).join(" ") + `> [${cursor.node.type.name}]: '${s.substring(cursor.from, cursor.to)}'`)
+    if (!cursor.firstChild()) {
+        return;
+    }
+    do {
+        vizTree(cursor, s, depth * 2 + 1);
+    } while (cursor.nextSibling());
 
+    cursor.parent();
+}
+
+vizTree(cursor, input, 0);
