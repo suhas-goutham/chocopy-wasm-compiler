@@ -4,12 +4,25 @@ import { defaultTypeEnv } from './type-check';
 import { NUM, BOOL, NONE, STRING } from './utils';
 import { memory } from 'console';
 
+var mem_js: { memory: any; };
+
 function stringify(typ: Type, arg: any) : string {
   switch(typ.tag) {
     case "number":
       return (arg as number).toString();
     case "string":
-      return String.fromCharCode(arg);
+      const view = new Int32Array(mem_js.memory.buffer);
+      let ascii_val = view[arg/4];
+      var i=1;
+      var full_string = "";
+      while(ascii_val!=0){
+        var char = String.fromCharCode(ascii_val);
+        full_string += char;
+        ascii_val = view[(arg/4)+i];
+        i+=1;
+      }
+      console.log("Full "+full_string);
+      return full_string;
     case "bool":
       return (arg as boolean)? "True" : "False";
     case "none":
@@ -29,6 +42,12 @@ function print(typ: Type, arg : number) : any {
 
 function webStart() {
   document.addEventListener("DOMContentLoaded", function() {
+    // if(!mem_js.memory){
+      const memory = new WebAssembly.Memory({initial:2000, maximum:2000});
+      const view = new Int32Array(memory.buffer);
+      view[0] = 4;
+      var memory_js = { memory: memory };
+    // }
     var importObject = {
       imports: {
         print_num: (arg: number) => print(NUM, arg),
@@ -40,8 +59,10 @@ function webStart() {
         max: Math.max,
         pow: Math.pow
       },
+      js:memory_js
     };
 
+    mem_js = importObject.js;
     var repl = new BasicREPL(importObject);
 
     function renderResult(result : Value) : void {
@@ -56,10 +77,11 @@ function webStart() {
         case "bool":
           elt.innerHTML = (result.value) ? "True" : "False";
           break;
-        case "string":
-          elt.innerText = "String stored at address "+String(result.value);
-          break;
         case "object":
+          if(result.name=="String"){
+            elt.innerText = print(STRING, result.address);
+            break;
+          }
           elt.innerHTML = `<${result.name} object at ${result.address}`
           break
         default: throw new Error(`Could not render value: ${result}`);

@@ -10,7 +10,7 @@ import * as compiler from './compiler';
 import {parse} from './parser';
 import {emptyLocalTypeEnv, GlobalTypeEnv, tc, tcStmt} from  './type-check';
 import { Type, Value } from './ast';
-import { PyValue, NONE, BOOL, NUM, CLASS } from "./utils";
+import { PyValue, NONE, BOOL, NUM, CLASS, STRING } from "./utils";
 
 export type Config = {
   importObject: any;
@@ -90,6 +90,6 @@ export async function run(source : string, config: Config) : Promise<[Value, com
   )`;
   console.log(wasmSource);
   const result = await runWat(wasmSource, importObject);
-
+  console.log("program type "+progTyp.tag);
   return [PyValue(progTyp, result), compiled.newEnv, tenv, compiled.functions];
 }

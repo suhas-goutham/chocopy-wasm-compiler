@@ -5,7 +5,7 @@ export function PyValue(typ: Type, result: number): Value {
     case "number":
       return PyInt(result);
     case "string":
-      return PyString(result);
+      return PyObj("String",result);
     case "bool":
       return PyBool(Boolean(result));
     case "class":
@@ -19,15 +19,12 @@ export function PyInt(n: number): Value {
   return { tag: "num", value: BigInt(n) };
 }
 
-export function PyString(n: number): Value {
-  return { tag: "string", value: n };
-}
-
 export function PyBool(b: boolean): Value {
   return { tag: "bool", value: b };
 }
 
 export function PyObj(name: string, address: number): Value {
+  console.log("Address "+address);
   if (address === 0) return PyNone();
   else return { tag: "object", name, address };
 }

@@ -72,8 +72,6 @@ export function compile(ast: Program<Type>, env: GlobalEnv) : CompileResult {
   
   const definedVars : Set<string> = new Set(); //getLocals(ast);
   definedVars.add("$last");
-  definedVars.add("$string_address"); //required for printing a string
-  definedVars.add("$string_ascii_val"); //required for printing a string
   definedVars.forEach(env.locals.add, env.locals);
   const localDefines = makeLocals(definedVars);
   const funs : Array<string> = [];
@@ -211,29 +209,8 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
       var callName = expr.name;
       if (expr.name === "print" && argTyp === NUM) {
         callName = "print_num";
-      } 
-      else if (expr.name === "print" && argTyp === STRING) {
+      } else if (expr.name === "print" && argTyp === STRING) {
         callName = "print_str";
-        
-        //In order to print all characters in a string, I am using the starting address of the first character to
-        //load the ASCII value of the first character and then call print_str function which prints out the character. 
-        //Then I am increasing the offset by 4 to print the next character and so on. Each time before printing I am 
-        //checking if the ASCII value stored in the character is 0. If it is 0, I am stopping the loop to print the charcters.
-              
-        const print_str_stmts = [
-              `${argStmts.join("")}(local.set $$string_address)
-              (block $loop_break 
-                (loop $loop_start 
-                  (local.get $$string_address)(i32.load)(local.set $$string_ascii_val)
-                  (local.get $$string_ascii_val) (i32.const 0) (i32.eq) (br_if $loop_break)
-                  (local.get $$string_ascii_val)(call $${callName}) 
-                  (local.get $$string_address)(i32.const 4)(i32.add) (local.set $$string_address)
-                (br $loop_start)))
-              ${argStmts.join(" ")}`
-              ];
-                
-        return print_str_stmts;
-      
       } else if (expr.name === "print" && argTyp === BOOL) {
         callName = "print_bool";
       } else if (expr.name === "print" && argTyp === NONE) {
@@ -317,34 +294,34 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
 }
 
 function allocateStringMemory(string_val:string) : Array<string>{
-
   const stmts = [];
   var i=0;
+
   while(i!=string_val.length){
     const char_ascii = string_val.charCodeAt(i);
     stmts.push(...[
-      `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
-      `(i32.add (i32.const ${i * 4}))`,       // Calc field offset from heap offset
-      `(i32.const ${char_ascii})`,
-      "(i32.store)"                            // Put the default field value on the heap
+      `(i32.load (i32.const 0))`,               // Load the dynamic heap head offset
+      `(i32.add (i32.const ${i * 4}))`,         // Calc string index offset from heap offset
+      `(i32.const ${char_ascii})`,              // Store the ASCII value of the string index
+      "(i32.store)"                             // Store the ASCII value in the new address
     ]);
     i+=1;
   }
 
-  //do something for ASCII 0
+  //At end of string, we store ASCII value 0 which represents null
   stmts.push(...[
-    `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
-    `(i32.add (i32.const ${i * 4}))`,       // Calc field offset from heap offset
-    `(i32.const 0)`,                        // Store ASCII value for 0
-    "(i32.store)"                            // Put the default field value on the heap
+    `(i32.load (i32.const 0))`,               // Load the dynamic heap head offset
+    `(i32.add (i32.const ${i * 4}))`,         // Calc string index offset from heap offset
+    `(i32.const 0)`,                          // Store ASCII value for 0 (end of string)
+    "(i32.store)"                             // Store the ASCII value 0 in the new address
   ]);
 
   return stmts.concat([
-    "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
-    "(i32.const 0)",                                                  // Address for our upcoming store instruction
-    "(i32.load (i32.const 0))",                                       // Load the dynamic heap head offset
-    `(i32.add (i32.const ${(string_val.length+1) * 4}))`,   // Move heap head beyond the two words we just created for fields
-    "(i32.store)",                                                    // Save the new heap offset
+    "(i32.load (i32.const 0))",                             // Get address for the first character of the string
+    "(i32.const 0)",                                        // Address for our upcoming store instruction
+    "(i32.load (i32.const 0))",                             // Load the dynamic heap head offset
+    `(i32.add (i32.const ${(string_val.length+1) * 4}))`,   // Move heap head beyond the string length
+    "(i32.store)",                                          // Save the new heap offset
   ]);
 } 
 
