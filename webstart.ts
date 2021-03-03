@@ -11,7 +11,9 @@ function stringify(typ: Type, arg: any) : string {
     case "number":
       return (arg as number).toString();
     case "string":
+      if(arg==-1) throw new Error("String index out of bounds");
       const view = new Int32Array(mem_js.memory.buffer);
+      arg=arg+4;
       let ascii_val = view[arg/4];
       var i=1;
       var full_string = "";
@@ -21,15 +23,15 @@ function stringify(typ: Type, arg: any) : string {
         ascii_val = view[(arg/4)+i];
         i+=1;
       }
-      console.log("Full "+full_string);
-      // return full_string;
-      const view1 = new Int32Array(mem_js.memory.buffer);
-      var i=0;
-      while(i<10){
-        console.log("View "+i*4+" Value "+view1[i]);
-        i+=1;
-      }
+      console.log("Full string "+full_string);
       return full_string;
+      // const view1 = new Int32Array(mem_js.memory.buffer);
+      // var i=0;
+      // while(i<15){
+      //   console.log("View "+i*4+" Value "+view1[i]);
+      //   i+=1;
+      // }
+      // return full_string;
     case "bool":
       return (arg as boolean)? "True" : "False";
     case "none":
