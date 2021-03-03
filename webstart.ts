@@ -22,6 +22,13 @@ function stringify(typ: Type, arg: any) : string {
         i+=1;
       }
       console.log("Full "+full_string);
+      // return full_string;
+      const view1 = new Int32Array(mem_js.memory.buffer);
+      var i=0;
+      while(i<10){
+        console.log("View "+i*4+" Value "+view1[i]);
+        i+=1;
+      }
       return full_string;
     case "bool":
       return (arg as boolean)? "True" : "False";

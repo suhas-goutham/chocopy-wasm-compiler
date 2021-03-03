@@ -72,7 +72,8 @@ export function compile(ast: Program<Type>, env: GlobalEnv) : CompileResult {
   
   const definedVars : Set<string> = new Set(); //getLocals(ast);
   definedVars.add("$last");
-  definedVars.add("$string_val"); //needed for string operations
+  definedVars.add("$string_val");   //needed for string operations
+  definedVars.add("$string_class"); //needed for strings in class
   definedVars.forEach(env.locals.add, env.locals);
   const localDefines = makeLocals(definedVars);
   const funs : Array<string> = [];
@@ -176,6 +177,8 @@ function codeGenDef(def : FunDef<Type>, env : GlobalEnv) : Array<string> {
   var definedVars : Set<string> = new Set();
   def.inits.forEach(v => definedVars.add(v.name));
   definedVars.add("$last");
+  definedVars.add("$string_val");   //needed for string operations
+  definedVars.add("$string_class"); //needed for strings in class
   // def.parameters.forEach(p => definedVars.delete(p.name));
   definedVars.forEach(env.locals.add, env.locals);
   def.parameters.forEach(p => env.locals.add(p.name));
@@ -247,24 +250,52 @@ function codeGenExpr(expr : Expr<Type>, env: GlobalEnv) : Array<string> {
       valStmts.push(`(call $${expr.name})`);
       return valStmts;
     case "construct":
+      // var stmts : Array<string> = [];
+      // env.classes.get(expr.name).forEach(([offset, initVal], field) => 
+      //   stmts.push(...[
+      //     `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
+      //     `(i32.add (i32.const ${offset * 4}))`,   // Calc field offset from heap offset
+      //     ...codeGenLiteral(initVal),              // Initialize field
+      //     "(i32.store)"                            // Put the default field value on the heap
+      //   ]));
+      // return stmts.concat([
+      //   "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
+      //   "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
+      //   "(i32.const 0)",                                                  // Address for our upcoming store instruction
+      //   "(i32.load (i32.const 0))",                                       // Load the dynamic heap head offset
+      //   `(i32.add (i32.const ${env.classes.get(expr.name).size * 4}))`,   // Move heap head beyond the two words we just created for fields
+      //   "(i32.store)",                                                    // Save the new heap offset
+      //   `(call $${expr.name}$__init__)`,                                  // call __init__
+      //   "(drop)"
+      // ]);
       var stmts : Array<string> = [];
+      stmts.push(...[
+        // "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
+        // "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
+        "(i32.const 0)",                                                  // Address for our upcoming store instruction
+        "(i32.load (i32.const 0))",                                       // Load the dynamic heap head offset
+        "(local.set $$string_class)",
+        "(i32.load (i32.const 0))",
+        `(i32.add (i32.const ${env.classes.get(expr.name).size * 4}))`,   // Move heap head beyond the two words we just created for fields
+        "(i32.store)"                                                    // Save the new heap offset
+        // `(call $${expr.name}$__init__)`,                                  // call __init__
+        // "(drop)"
+      ]);
       env.classes.get(expr.name).forEach(([offset, initVal], field) => 
         stmts.push(...[
-          `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
+          `(local.get $$string_class)`,
+          // `(i32.load (i32.const 0))`,              // Load the dynamic heap head offset
           `(i32.add (i32.const ${offset * 4}))`,   // Calc field offset from heap offset
           ...codeGenLiteral(initVal),              // Initialize field
           "(i32.store)"                            // Put the default field value on the heap
         ]));
-      return stmts.concat([
-        "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
-        "(i32.load (i32.const 0))",                                       // Get address for the object (this is the return value)
-        "(i32.const 0)",                                                  // Address for our upcoming store instruction
-        "(i32.load (i32.const 0))",                                       // Load the dynamic heap head offset
-        `(i32.add (i32.const ${env.classes.get(expr.name).size * 4}))`,   // Move heap head beyond the two words we just created for fields
-        "(i32.store)",                                                    // Save the new heap offset
+      stmts.push(...[
+        "(local.get $$string_class)",
         `(call $${expr.name}$__init__)`,                                  // call __init__
-        "(drop)"
-      ]);
+        "(drop)",
+        "(local.get $$string_class)"
+      ])
+      return stmts;
     case "method-call":
       var objStmts = codeGenExpr(expr.obj, env);
       var objTyp = expr.obj.a;
