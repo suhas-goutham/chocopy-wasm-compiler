@@ -1,5 +1,5 @@
 import { PyInt, PyBool, PyNone, PyObj } from '../utils';
-import { assert, asserts, assertPrint } from "./utils.test";
+import { assert, asserts, assertPrint, assertFail } from "./utils.test";
 
 // We write end-to-end tests here to make sure the compiler works as expected.
 // You should write enough end-to-end tests until you are confident the compiler
@@ -261,4 +261,56 @@ f(2)`, PyInt(2));
     
   c : C = None
   c`, PyNone());
+
+  assertPrint("print-1-string", `
+  print("ABC")`, ["ABC"]);
+  
+  assertPrint("print-2-strings", `
+  print("Compiler")
+  print("Design")`, ["Compiler", "Design"]);
+
+  assertPrint("print-string-index", `
+  print("Design"[2])`, ["s"]);
+
+  assertPrint("class-with-string-fields", `
+  class C(object):
+    x : str = "Sandhya"
+    y : str = "Jayaraman"
+
+  c1 : C = None
+  c1 = C()
+  print(c1.x)
+  c1.x = "Joe"
+  print(c1.x)`, ["Sandhya", "Joe"]);
+
+  assertPrint("class-with-string-fields-inside-functions", `
+  class C(object):
+    x : str = "ZZZ"
+
+    def func(self:C, z:str)->str:
+      self.x = z
+      return self.x
+
+  c1 : C = None
+  c1 = C()
+  print(c1.func("AAA"))`, ["AAA"]);
+
+  assertPrint("string-index-inside-class", `
+  class C(object):
+    x : str = "PQR"
+
+    def func(self:C)->str:
+      return self.x[2]
+
+  c1 : C = None
+  c1 = C()
+  print(c1.func())`, ["R"]);
+
+  assertFail("string-index-out-of-bounds", `
+  class C(object):
+    x : str = "ABCDEF"
+    
+  c : C = None
+  c = C()
+  printi(c.x[10])`);
 });
