@@ -68,7 +68,7 @@ function webStart() {
         max: Math.max,
         pow: Math.pow
       },
-      js:memory_js
+      js:memory_js,
     };
 
     mem_js = importObject.js;
